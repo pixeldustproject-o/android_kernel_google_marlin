@@ -1719,8 +1719,9 @@ static inline
 int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags,
 		   int sibling_count_hint)
 {
-	cpu = p->sched_class->select_task_rq(p, cpu, sd_flags, wake_flags,
-						      sibling_count_hint);
+	if (p->nr_cpus_allowed > 1)
+	        cpu = p->sched_class->select_task_rq(p, cpu, sd_flags, wake_flags,
+						              sibling_count_hint);
 
 
 	/*
