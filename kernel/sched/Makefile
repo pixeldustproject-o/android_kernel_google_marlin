@@ -1,3 +1,4 @@
+CFLAGS_REMOVE_deadline.o = -Wno-incompatible-pointer-types
 ifdef CONFIG_FUNCTION_TRACER
 CFLAGS_REMOVE_clock.o = -pg
 endif
