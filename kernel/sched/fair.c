@@ -2456,8 +2456,6 @@ static u32 __compute_runnable_contrib(u64 n)
 #error "load tracking assumes 2^10 as unit"
 #endif
 
-#define cap_scale(v, s) ((v)*(s) >> SCHED_CAPACITY_SHIFT)
-
 /*
  * We can represent the historical contribution to runnable average as the
  * coefficients of a geometric series.  To do this we sub-divide our runnable
