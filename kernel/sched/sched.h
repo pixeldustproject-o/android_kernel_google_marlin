@@ -2014,8 +2014,6 @@ void __dl_update(struct dl_bw *dl_b, s64 bw)
 	struct root_domain *rd = container_of(dl_b, struct root_domain, dl_bw);
 	int i;
 
-	RCU_LOCKDEP_WARN(!rcu_read_lock_sched_held(),
-			 "sched RCU must be held");
 	for_each_cpu_and(i, rd->span, cpu_active_mask) {
 		struct rq *rq = cpu_rq(i);
 
