@@ -986,7 +986,8 @@ static void update_curr_dl(struct rq *rq)
 	curr->se.exec_start = rq_clock_task(rq);
 	cpuacct_charge(curr, delta_exec);
 
-	delta_exec = grub_reclaim(delta_exec, rq);
+	if (unlikely(dl_se->flags & SCHED_FLAG_RECLAIM))
+		delta_exec = grub_reclaim(delta_exec, rq);
 	dl_se->runtime -= delta_exec;
 
 throttle:
