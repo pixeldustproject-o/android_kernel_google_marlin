@@ -1421,13 +1421,22 @@ struct sched_dl_entity {
 	 * @dl_yielded tells if task gave up the cpu before consuming
 	 * all its available runtime during the last job.
 	 */
-	int dl_throttled, dl_boosted, dl_yielded;
+	int dl_throttled, dl_boosted, dl_yielded, dl_non_contending;
 
 	/*
 	 * Bandwidth enforcement timer. Each -deadline task has its
 	 * own bandwidth to be enforced, thus we need one timer per task.
 	 */
 	struct hrtimer dl_timer;
+
+	/*
+	 * Inactive timer, responsible for decreasing the active utilization
+	 * at the "0-lag time". When a -deadline task blocks, it contributes
+	 * to GRUB's active utilization until the "0-lag time", hence a
+	 * timer is needed to decrease the active utilization at the correct
+	 * time.
+	 */
+	struct hrtimer inactive_timer;
 };
 
 union rcu_special {
