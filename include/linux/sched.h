@@ -1421,7 +1421,10 @@ struct sched_dl_entity {
 	 * @dl_yielded tells if task gave up the cpu before consuming
 	 * all its available runtime during the last job.
 	 */
-	int dl_throttled, dl_boosted, dl_yielded, dl_non_contending;
+	int				dl_throttled      : 1;
+	int				dl_boosted        : 1;
+	int				dl_yielded        : 1;
+	int				dl_non_contending : 1;
 
 	/*
 	 * Bandwidth enforcement timer. Each -deadline task has its
