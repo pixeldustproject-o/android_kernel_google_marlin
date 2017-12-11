@@ -144,13 +144,13 @@ endchoice
 config DEFAULT_IOSCHED
 	string
 	default "bfq" if DEFAULT_BFQ
-	default "deadline" if DEFAULT_DEADLINE
-	default "tripndroid" if DEFAULT_TRIPNDROID
 	default "cfq" if DEFAULT_CFQ
-	default "noop" if DEFAULT_NOOP
+	default "deadline" if DEFAULT_DEADLINE
 	default "fiops" if DEFAULT_FIOPS
-	default "sio" if DEFAULT_SIO
 	default "maple" if DEFAULT_MAPLE
+	default "noop" if DEFAULT_NOOP
+	default "tripndroid" if DEFAULT_TRIPNDROID
+	default "sio" if DEFAULT_SIO
 
 endmenu
 
