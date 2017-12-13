@@ -409,7 +409,7 @@ KBUILD_CFLAGS   := -Werror -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-discarded-array-qualifiers -Wno-incompatible-pointer-types \
 		   -Wno-return-local-addr -Wno-nonnull -Wno-bool-compare \
 		   -Wno-stringop-overflow -Wno-error=misleading-indentation \
-		   -std=gnu89 -Wno-error=maybe-uninitialized
+		   -std=gnu89 -Wno-error=maybe-uninitialized -w
 
 BUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
@@ -615,6 +615,14 @@ endif # $(dot-config)
 all: vmlinux
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
+
+ifneq ($(COMPILER),clang)
+LDFLAGS		+= --strip-debug
+KBUILD_CFLAGS	+= $(call cc-option,-mlow-precision-recip-sqrt,) \
+		   $(call cc-option,-mpc-relative-literal-loads,)
+KBUILD_CFLAGS   += $(call cc-option,-fno-store-merging,)
+KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
+endif
 
 KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
 KBUILD_CFLAGS	+= $(call cc-disable-warning,frame-address,)
