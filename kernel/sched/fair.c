@@ -6092,16 +6092,10 @@ static int cpu_util_wake(int cpu, struct task_struct *p)
 	return (util >= capacity) ? capacity : util;
 }
 
-static int start_cpu(bool boosted)
-{
-	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
-
-	return boosted ? rd->max_cap_orig_cpu : rd->min_cap_orig_cpu;
-}
-
 static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 				   bool boosted, bool prefer_idle)
 {
+	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
 	unsigned long min_util = boosted_task_util(p);
 	unsigned long target_capacity = ULONG_MAX;
 	unsigned long min_wake_util = ULONG_MAX;
@@ -6122,8 +6116,25 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	schedstat_inc(p, se.statistics.nr_wakeups_fbt_attempts);
 	schedstat_inc(this_rq(), eas_stats.fbt_attempts);
 
-	/* Find start CPU based on boost value */
-	cpu = start_cpu(boosted);
+	/*
+	 * target_capacity tracks capacity_orig of the most promising candidate
+	 * CPU, which is in most cases the most energy efficient CPU, thus
+	 * requiring to minimise target_capacity. For these cases we initialise
+	 * target_capacity to ULONG_MAX.
+	 * However, for prefer_idle and boosted tasks we look for a high
+	 * performance CPU, thus requiring to maximise target_capacity. In this
+	 * case we initialise target_capacity to 0.
+	 */
+	if (prefer_idle && boosted)
+		target_capacity = 0;
+
+	/*
+	 * Start from the first maximum capacity CPU.
+	 * This will increase the chances to select a reserved CPU for
+	 * prefer_idle and boosted tasks while not impacting the selection
+	 * of the most energy efficient CPUs in the other cases.
+	 */
+	cpu = rd->max_cap_orig_cpu;
 	if (cpu < 0) {
 		schedstat_inc(p, se.statistics.nr_wakeups_fbt_no_cpu);
 		schedstat_inc(this_rq(), eas_stats.fbt_no_cpu);
@@ -6211,19 +6222,26 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 
 				/*
 				 * Case A.1: IDLE CPU
-				 * Return the first IDLE CPU we find.
+				 * Return the best IDLE CPU we find:
+				 * - for boosted tasks: the CPU with the highest
+				 * performance (i.e. biggest capacity_orig)
+				 * - for !boosted tasks: the most energy
+				 * efficient CPU (i.e. smallest capacity_orig)
 				 */
 				if (idle_cpu(i)) {
-					schedstat_inc(p, se.statistics.nr_wakeups_fbt_pref_idle);
-					schedstat_inc(this_rq(), eas_stats.fbt_pref_idle);
+					if (boosted &&
+					   (capacity_orig <= target_capacity))
+						continue;
+					if (!boosted &&
+					   (capacity_orig >= target_capacity))
+						continue;
 
-					trace_sched_find_best_target(p,
-							prefer_idle, min_util,
-							cpu, best_idle_cpu,
-							best_active_cpu, i);
-
-					return i;
+					target_capacity = capacity_orig;
+					best_idle_cpu = i;
+					continue;
 				}
+				if (best_idle_cpu != -1)
+					continue;
 
 				/*
 				 * Case A.2: Target ACTIVE CPU
@@ -6315,8 +6333,9 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 				 * IOW, prefer a deep IDLE LITTLE CPU vs a
 				 * shallow idle big CPU.
 				 */
-				if (sysctl_sched_cstate_aware &&
-				    best_idle_cstate <= idle_idx)
+				if ((capacity_orig == target_capacity) &&
+				    sysctl_sched_cstate_aware &&
+				    (best_idle_cstate <= idle_idx))
 					continue;
 
 				/* Keep track of best idle CPU */
@@ -6349,8 +6368,8 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 			 */
 
 			/* Favor CPUs with maximum spare capacity */
-			if ((capacity_orig - min_capped_util) <
-				target_max_spare_cap)
+			if ((capacity_orig == target_capacity) &&
+			    ((capacity_orig - min_capped_util) < target_max_spare_cap))
 				continue;
 
 			/* Favor CPUs with maximum free utilization */
@@ -6374,7 +6393,7 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	 *
 	 * - prefer_idle tasks:
 	 *
-	 *   a) IDLE CPU available, we return immediately
+	 *   a) IDLE CPU available: best_idle_cpu
 	 *   b) ACTIVE CPU where task fits and has the bigger maximum spare
 	 *      capacity (i.e. target_cpu)
 	 *   c) ACTIVE CPU with less contention due to other tasks
@@ -6385,6 +6404,18 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	 *   a) ACTIVE CPU: target_cpu
 	 *   b) IDLE CPU: best_idle_cpu
 	 */
+
+	if (prefer_idle && (best_idle_cpu != -1)) {
+		schedstat_inc(p, se.statistics.nr_wakeups_fbt_pref_idle);
+		schedstat_inc(this_rq(), eas_stats.fbt_pref_idle);
+
+		trace_sched_find_best_target(p, prefer_idle, min_util, cpu,
+					     best_idle_cpu, best_active_cpu,
+					     best_idle_cpu);
+
+		return best_idle_cpu;
+	}
+
 	if (target_cpu == -1)
 		target_cpu = prefer_idle
 			? best_active_cpu
